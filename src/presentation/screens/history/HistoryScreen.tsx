@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { getTransactionHistoryUseCase } from '../../../core/di/container';
 import { TransactionEntity } from '../../../domain/entities/TransactionEntity';
@@ -66,7 +67,7 @@ export default function HistoryScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <Text style={styles.title}>Order History</Text>
             
             {loading && <ActivityIndicator size="large" color="#2563EB" style={{ marginBottom: 16 }} />}
@@ -174,13 +175,13 @@ export default function HistoryScreen() {
                     <ChevronRight size={18} color={page === totalPages ? "#D1D5DB" : "#111827"} />
                 </TouchableOpacity>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingTop: 40, paddingBottom: 100 },
-    title: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 24 },
+    container: { flex: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingBottom: 100 },
+    title: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 24, marginTop: 12 },
     
     actionRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 12 },
     searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, height: 44 },

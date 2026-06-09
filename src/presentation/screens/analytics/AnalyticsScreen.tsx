@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, Animated, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAnalyticsStore } from '../../store/useAnalyticsStore';
 import { getTopMenusUseCase } from '../../../core/di/container';
 import { TopMenuData } from '../../../domain/usecases/analytics/GetTopMenusUseCase';
@@ -36,120 +37,122 @@ export default function AnalyticsScreen() {
     const peakSales = maxSales === 0 ? 1 : maxSales; // Hindari pembagian 0
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
-            <View style={styles.card}>
-                
-                {/* Header & Dropdown */}
-                <View style={styles.header}>
-                    <View style={styles.headerLeft}>
-                        <View>
-                            <Text style={styles.title}>Total Penjualan</Text>
-                            <Text style={styles.subtitle}>
-                                {filter === 'Hari' ? 'Minggu Ini' : filter === 'Minggu' ? 'Bulan Ini' : 'Tahun Ini'}
+        <SafeAreaView style={styles.container}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
+                <View style={styles.card}>
+                    
+                    {/* Header & Dropdown */}
+                    <View style={styles.header}>
+                        <View style={styles.headerLeft}>
+                            <View>
+                                <Text style={styles.title}>Total Penjualan</Text>
+                                <Text style={styles.subtitle}>
+                                    {filter === 'Hari' ? 'Minggu Ini' : filter === 'Minggu' ? 'Bulan Ini' : 'Tahun Ini'}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View style={{ zIndex: 50 }}>
+                            <TouchableOpacity 
+                                style={styles.dropdownBtn} 
+                                onPress={() => setShowDropdown(!showDropdown)}
+                            >
+                                <Text style={styles.dropdownBtnText}>{filter}</Text>
+                                <ChevronDown size={14} color="#6B7280" />
+                            </TouchableOpacity>
+
+                            {showDropdown && (
+                                <View style={styles.dropdownMenu}>
+                                    {['Hari', 'Minggu', 'Bulan'].map((opt) => (
+                                        <TouchableOpacity 
+                                            key={opt}
+                                            style={styles.dropdownItem}
+                                            onPress={async () => {
+                                                setShowDropdown(false);
+                                                chartAnim.setValue(0);
+                                                await loadAnalytics(opt as any);
+                                                const realTopMenus = await getTopMenusUseCase.execute();
+                                                setTopMenus(realTopMenus);
+                                                Animated.timing(chartAnim, { toValue: 1, duration: 1000, useNativeDriver: false }).start();
+                                            }}
+                                        >
+                                            <Text style={[styles.dropdownItemText, filter === opt && styles.dropdownItemTextActive]}>{opt}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* Amount */}
+                    <View style={styles.amountRow}>
+                        <Text style={styles.amount}>Rp {data.totalSales.toLocaleString('id-ID')}</Text>
+                        <View style={[styles.badge, { backgroundColor: data.growthPercentage >= 0 ? '#D1FAE5' : '#FEE2E2' }]}>
+                            <Text style={[styles.badgeText, { color: data.growthPercentage >= 0 ? '#059669' : '#DC2626' }]}>
+                                {data.growthPercentage >= 0 ? '+' : ''}{data.growthPercentage.toFixed(1)}%
                             </Text>
                         </View>
                     </View>
 
-                    <View style={{ zIndex: 50 }}>
-                        <TouchableOpacity 
-                            style={styles.dropdownBtn} 
-                            onPress={() => setShowDropdown(!showDropdown)}
-                        >
-                            <Text style={styles.dropdownBtnText}>{filter}</Text>
-                            <ChevronDown size={14} color="#6B7280" />
-                        </TouchableOpacity>
+                    {/* Bar Chart Realtime */}
+                    <View style={styles.chartContainer}>
+                        <View style={styles.barsArea}>
+                            {data.chartData.map((val, idx) => {
+                                const isPeak = val === maxSales && maxSales > 0;
+                                const heightPercent = (val / peakSales) * 100;
+                                const animatedHeight = chartAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['0%', `${heightPercent}%`]
+                                });
+                                
+                                return (
+                                    <View key={idx} style={styles.barWrapper}>
+                                        <Animated.View style={[styles.bar, { height: animatedHeight, backgroundColor: isPeak ? '#2563EB' : '#DBEAFE', maxWidth: filter === 'Bulan' ? 20 : 40 }]} />
+                                    </View>
+                                );
+                            })}
+                        </View>
+                        <View style={styles.chartLabels}>
+                            {data.chartLabels.map((lbl, idx) => (
+                                <Text key={idx} style={[styles.chartLabel, { fontSize: filter === 'Bulan' ? 8 : 10 }]}>{lbl}</Text>
+                            ))}
+                        </View>
+                    </View>
 
-                        {showDropdown && (
-                            <View style={styles.dropdownMenu}>
-                                {['Hari', 'Minggu', 'Bulan'].map((opt) => (
-                                    <TouchableOpacity 
-                                        key={opt}
-                                        style={styles.dropdownItem}
-                                        onPress={async () => {
-                                            setShowDropdown(false);
-                                            chartAnim.setValue(0);
-                                            await loadAnalytics(opt as any);
-                                            const realTopMenus = await getTopMenusUseCase.execute();
-                                            setTopMenus(realTopMenus);
-                                            Animated.timing(chartAnim, { toValue: 1, duration: 1000, useNativeDriver: false }).start();
-                                        }}
-                                    >
-                                        <Text style={[styles.dropdownItemText, filter === opt && styles.dropdownItemTextActive]}>{opt}</Text>
-                                    </TouchableOpacity>
-                                ))}
+                    {/* Top Menus */}
+                    <Text style={styles.sectionTitle}>Top Menu Terlaris</Text>
+                    <View style={styles.topMenusList}>
+                        {data.topMenus.map((item, idx) => (
+                            <View key={item.id} style={styles.menuItem}>
+                                <View style={[styles.menuIconBox, { backgroundColor: idx === 0 ? '#D1FAE5' : idx === 1 ? '#FEF3C7' : '#E0E7FF' }]}>
+                                    {item.category === 'Minuman' ? <Coffee size={20} color={idx === 0 ? '#059669' : idx === 1 ? '#D97706' : '#4F46E5'} /> : 
+                                    item.category === 'Camilan' ? <CakeSlice size={20} color={idx === 0 ? '#059669' : idx === 1 ? '#D97706' : '#4F46E5'} /> : 
+                                    <Utensils size={20} color={idx === 0 ? '#059669' : idx === 1 ? '#D97706' : '#4F46E5'} />}
+                                </View>
+                                <View style={styles.menuInfo}>
+                                    <Text style={styles.menuName}>{item.name}</Text>
+                                    <Text style={styles.menuSales}>{item.salesCount} porsi</Text>
+                                </View>
+                                <View style={styles.menuStats}>
+                                    <Text style={styles.menuRevenue}>Rp {item.revenue.toLocaleString('id-ID')}</Text>
+                                    <Text style={styles.menuPercentage}>{item.percentage}%</Text>
+                                </View>
                             </View>
+                        ))}
+                        {data.topMenus.length === 0 && (
+                            <Text style={styles.emptyText}>Belum ada data menu</Text>
                         )}
                     </View>
+                    
                 </View>
-
-                {/* Amount */}
-                <View style={styles.amountRow}>
-                    <Text style={styles.amount}>Rp {data.totalSales.toLocaleString('id-ID')}</Text>
-                    <View style={[styles.badge, { backgroundColor: data.growthPercentage >= 0 ? '#D1FAE5' : '#FEE2E2' }]}>
-                        <Text style={[styles.badgeText, { color: data.growthPercentage >= 0 ? '#059669' : '#DC2626' }]}>
-                            {data.growthPercentage >= 0 ? '+' : ''}{data.growthPercentage.toFixed(1)}%
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Bar Chart Realtime */}
-                <View style={styles.chartContainer}>
-                    <View style={styles.barsArea}>
-                        {data.chartData.map((val, idx) => {
-                            const isPeak = val === maxSales && maxSales > 0;
-                            const heightPercent = (val / peakSales) * 100;
-                            const animatedHeight = chartAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: ['0%', `${heightPercent}%`]
-                            });
-                            
-                            return (
-                                <View key={idx} style={styles.barWrapper}>
-                                    <Animated.View style={[styles.bar, { height: animatedHeight, backgroundColor: isPeak ? '#2563EB' : '#DBEAFE', maxWidth: filter === 'Bulan' ? 20 : 40 }]} />
-                                </View>
-                            );
-                        })}
-                    </View>
-                    <View style={styles.chartLabels}>
-                        {data.chartLabels.map((lbl, idx) => (
-                            <Text key={idx} style={[styles.chartLabel, { fontSize: filter === 'Bulan' ? 8 : 10 }]}>{lbl}</Text>
-                        ))}
-                    </View>
-                </View>
-
-                {/* Top Menus */}
-                <Text style={styles.sectionTitle}>Top Menu Terlaris</Text>
-                <View style={styles.topMenusList}>
-                    {data.topMenus.map((item, idx) => (
-                        <View key={item.id} style={styles.menuItem}>
-                            <View style={[styles.menuIconBox, { backgroundColor: idx === 0 ? '#D1FAE5' : idx === 1 ? '#FEF3C7' : '#E0E7FF' }]}>
-                                {item.category === 'Minuman' ? <Coffee size={20} color={idx === 0 ? '#059669' : idx === 1 ? '#D97706' : '#4F46E5'} /> : 
-                                 item.category === 'Camilan' ? <CakeSlice size={20} color={idx === 0 ? '#059669' : idx === 1 ? '#D97706' : '#4F46E5'} /> : 
-                                 <Utensils size={20} color={idx === 0 ? '#059669' : idx === 1 ? '#D97706' : '#4F46E5'} />}
-                            </View>
-                            <View style={styles.menuInfo}>
-                                <Text style={styles.menuName}>{item.name}</Text>
-                                <Text style={styles.menuSales}>{item.salesCount} porsi</Text>
-                            </View>
-                            <View style={styles.menuStats}>
-                                <Text style={styles.menuRevenue}>Rp {item.revenue.toLocaleString('id-ID')}</Text>
-                                <Text style={styles.menuPercentage}>{item.percentage}%</Text>
-                            </View>
-                        </View>
-                    ))}
-                    {data.topMenus.length === 0 && (
-                        <Text style={styles.emptyText}>Belum ada data menu</Text>
-                    )}
-                </View>
-                
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     center: { flex: 1, backgroundColor: '#F8F9FB', justifyContent: 'center', alignItems: 'center' },
-    container: { flex: 1, backgroundColor: '#F8F9FB', padding: 16, paddingTop: 40 },
+    container: { flex: 1, backgroundColor: '#F8F9FB' },
     card: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 4 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, zIndex: 50 },
     headerLeft: { flexDirection: 'row', alignItems: 'center' },

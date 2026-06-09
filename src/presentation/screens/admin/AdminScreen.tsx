@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-    View, Text, FlatList, TouchableOpacity, SafeAreaView,
-    ActivityIndicator, StyleSheet, StatusBar, TextInput, Alert,
+    View, Text, FlatList, TouchableOpacity,
+    ActivityIndicator, StyleSheet, StatusBar, TextInput, Alert, useWindowDimensions
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWangkuAdminStore } from '../../store/useWangkuAdminStore';
 import { useMenuStore } from '../../store/useMenuStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import MenuCard from '../../components/MenuCard';
 import PaymentModal from '../../components/PaymentModal';
 import ReceiptModal from '../../components/ReceiptModal';
@@ -20,7 +22,11 @@ const categoryIcons: Record<string, (color: string) => React.ReactNode> = {
 
 export default function AdminScreen() {
     const { cart, totalPrice, addToCart, decreaseQty, clearCart, checkout, isLoading: isCheckingOut } = useWangkuAdminStore();
-    const { menus, isLoading, loadMenus, deleteMenu } = useMenuStore();
+    const { menus, isLoading, loadMenus, deleteMenu, syncFromCloud } = useMenuStore();
+    const { storeName } = useSettingsStore();
+
+    const { width } = useWindowDimensions();
+    const numColumns = width >= 1024 ? 5 : width >= 768 ? 4 : width >= 480 ? 3 : 2;
 
     const [activeCategory, setActiveCategory] = useState('Semua');
     const [searchQuery, setSearchQuery] = useState('');
@@ -34,8 +40,9 @@ export default function AdminScreen() {
     const [receiptTotal, setReceiptTotal] = useState(0);
 
     useEffect(() => {
-        loadMenus();
-    }, [loadMenus]);
+        loadMenus(); // Load local first for speed
+        syncFromCloud(); // Then pull from Supabase to sync with this specific account
+    }, []);
 
     // Hanya tampilkan kategori yang punya menu, plus 'Semua'
     const existingCategories = Array.from(new Set(menus.map(m => m.category || 'Makanan')));
@@ -104,17 +111,12 @@ export default function AdminScreen() {
         setReceiptCart([...cart]);
         setReceiptTotal(totalPrice);
         setShowPayment(false);
-        // TODO: Tampilkan QR Code dulu sebelum selesai
         await checkout('QRIS');
         setShowReceipt(true);
     };
-
-    // Tutup struk, reset semua
     const handleCloseReceipt = () => {
         setShowReceipt(false);
     };
-
-    // Hitung total item di keranjang
     const totalItems = cart.reduce((sum, item) => sum + item.qty, 0);
 
     return (
@@ -129,6 +131,7 @@ export default function AdminScreen() {
                     </View>
                     <View>
                         <Text style={styles.headerTitle}>Wangku</Text>
+                        <Text style={styles.headerSubtitle}>{storeName}</Text>
                     </View>
                 </View>
 
@@ -199,13 +202,12 @@ export default function AdminScreen() {
                     <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 40 }} />
                 ) : (
                     <FlatList
-                        numColumns={2}
-                        key={'grid-2-cols'}
+                        numColumns={numColumns}
+                        key={`grid-${numColumns}-cols`}
                         data={filteredMenus}
                         keyExtractor={(item) => item.id}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingHorizontal: 10, paddingBottom: 120 }}
-                        columnWrapperStyle={{ justifyContent: 'space-between' }}
                         renderItem={({ item }) => (
                             <MenuCard
                                 id={item.id}

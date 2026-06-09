@@ -1,23 +1,17 @@
 import { MenuEntity } from '../../entities/MenuEntity';
 import { IMenuRepository } from '../../repositories/IMenuRepository';
 
-/**
- * GetAllMenusUseCase — Mengambil semua data menu.
- * Tidak tahu database apa yang dipakai di belakang layar.
- */
+
 export class GetAllMenusUseCase {
-    constructor(private menuRepo: IMenuRepository) {}
+    constructor(private menuRepo: IMenuRepository) { }
 
     async execute(): Promise<MenuEntity[]> {
         return this.menuRepo.getAll();
     }
 }
 
-/**
- * AddMenuUseCase — Menambahkan menu baru.
- */
 export class AddMenuUseCase {
-    constructor(private menuRepo: IMenuRepository) {}
+    constructor(private menuRepo: IMenuRepository) { }
 
     async execute(name: string, category: string, price: number, imageUrl?: string): Promise<MenuEntity> {
         // Validasi bisnis di sini
@@ -29,22 +23,16 @@ export class AddMenuUseCase {
     }
 }
 
-/**
- * DeleteMenuUseCase — Menghapus menu.
- */
 export class DeleteMenuUseCase {
-    constructor(private menuRepo: IMenuRepository) {}
+    constructor(private menuRepo: IMenuRepository) { }
 
     async execute(id: string): Promise<void> {
         return this.menuRepo.delete(id);
     }
 }
 
-/**
- * SyncMenusUseCase — Sinkronisasi data menu antara lokal & cloud.
- */
 export class SyncMenusUseCase {
-    constructor(private menuRepo: IMenuRepository) {}
+    constructor(private menuRepo: IMenuRepository) { }
 
     async pullFromCloud(): Promise<void> {
         return this.menuRepo.pullFromCloud();

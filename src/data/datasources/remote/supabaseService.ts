@@ -1,12 +1,8 @@
 import { supabase } from '../../../core/config/supabase';
 
-/**
- * SupabaseMenuService
- * Menangani semua operasi CRUD menu ke Supabase (cloud).
- */
+
 export class SupabaseMenuService {
 
-    /** Ambil semua menu dari Supabase */
     async fetchAllMenus() {
         const { data, error } = await supabase
             .from('menus')
@@ -17,7 +13,6 @@ export class SupabaseMenuService {
         return data || [];
     }
 
-    /** Upload / upsert satu menu ke Supabase */
     async upsertMenu(menu: {
         id: string;
         name: string;
@@ -34,7 +29,6 @@ export class SupabaseMenuService {
         if (error) throw new Error(`Gagal upsert menu: ${error.message}`);
     }
 
-    /** Hapus menu dari Supabase */
     async deleteMenu(id: string) {
         const { error } = await supabase
             .from('menus')
@@ -47,7 +41,6 @@ export class SupabaseMenuService {
 
 export class SupabaseTransactionService {
 
-    /** Simpan transaksi + item ke Supabase sekaligus */
     async pushTransaction(transaction: {
         id: string;
         total_amount: number;
@@ -62,14 +55,11 @@ export class SupabaseTransactionService {
         subtotal: number;
         created_at: string;
     }>) {
-        // 1. Insert transaksi
         const { error: txError } = await supabase
             .from('transactions')
             .upsert(transaction, { onConflict: 'id' });
 
         if (txError) throw new Error(`Gagal push transaksi: ${txError.message}`);
-
-        // 2. Insert semua item
         if (items.length > 0) {
             const { error: itemError } = await supabase
                 .from('transaction_items')
@@ -78,8 +68,6 @@ export class SupabaseTransactionService {
             if (itemError) throw new Error(`Gagal push item transaksi: ${itemError.message}`);
         }
     }
-
-    /** Ambil semua transaksi dari Supabase (untuk Owner dashboard) */
     async fetchAllTransactions() {
         const { data, error } = await supabase
             .from('transactions')

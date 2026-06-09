@@ -103,14 +103,14 @@ export default function AddMenuModal({ visible, onClose }: AddMenuModalProps) {
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             {['Makanan', 'Minuman', 'Camilan'].map(cat => (
                                 <TouchableOpacity
-                                    key={cat} 
+                                    key={cat}
                                     style={[styles.categoryBtn, category === cat && styles.categoryBtnActive]}
                                     onPress={() => setCategory(cat)}
                                 >
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        {cat === 'Makanan' ? <Utensils size={16} color={category === cat ? '#2563EB' : '#6B7280'} /> : 
-                                         cat === 'Minuman' ? <Coffee size={16} color={category === cat ? '#2563EB' : '#6B7280'} /> : 
-                                         <CakeSlice size={16} color={category === cat ? '#2563EB' : '#6B7280'} />}
+                                        {cat === 'Makanan' ? <Utensils size={16} color={category === cat ? '#2563EB' : '#6B7280'} /> :
+                                            cat === 'Minuman' ? <Coffee size={16} color={category === cat ? '#2563EB' : '#6B7280'} /> :
+                                                <CakeSlice size={16} color={category === cat ? '#2563EB' : '#6B7280'} />}
                                         <Text style={[styles.categoryBtnText, category === cat && styles.categoryBtnTextActive]}>{cat}</Text>
                                     </View>
                                 </TouchableOpacity>
@@ -128,7 +128,6 @@ export default function AddMenuModal({ visible, onClose }: AddMenuModalProps) {
                         />
                     </View>
 
-                    {/* Tombol Simpan */}
                     <TouchableOpacity
                         style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
                         activeOpacity={0.8}
@@ -136,7 +135,7 @@ export default function AddMenuModal({ visible, onClose }: AddMenuModalProps) {
                         disabled={isSubmitting}
                     >
                         <Text style={styles.submitBtnText}>
-                            {isSubmitting ? 'Menyimpan...' : '💾 Simpan Menu'}
+                            {isSubmitting ? 'Menyimpan...' : 'Simpan Menu'}
                         </Text>
                     </TouchableOpacity>
                 </View>

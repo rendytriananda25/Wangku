@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@nozbe/watermelondb": "^0.28.0",
+    "@react-native-async-storage/async-storage": "^3.1.1",
     "@react-native/new-app-screen": "0.85.3",
     "@supabase/supabase-js": "^2.107.0",
     "lucide-react-native": "^1.17.0",
