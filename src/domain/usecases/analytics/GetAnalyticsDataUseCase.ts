@@ -4,6 +4,8 @@ import { IMenuRepository } from '../../repositories/IMenuRepository';
 export interface AnalyticsData {
     totalSales: number;
     growthPercentage: number;
+    transactionCount: number;
+    averageBasketSize: number;
     chartData: number[]; // Dinamis berdasarkan filter
     chartLabels: string[]; // Label dinamis
     topMenus: any[]; 
@@ -83,6 +85,25 @@ export class GetAnalyticsDataUseCase {
             });
         }
 
+        let transactionCount = 0;
+        let lastPeriodTransactionCount = 0;
+        
+        txs.forEach(tx => {
+            const txDate = new Date(tx.createdAt);
+            if (filter === 'Hari') {
+                const currentDay = now.getDay();
+                const dayOffset = currentDay === 0 ? 6 : currentDay - 1;
+                const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOffset);
+                if (txDate >= startOfWeek) transactionCount++;
+            } else if (filter === 'Minggu') {
+                if (txDate.getMonth() === now.getMonth() && txDate.getFullYear() === now.getFullYear()) transactionCount++;
+            } else if (filter === 'Bulan') {
+                if (txDate.getFullYear() === now.getFullYear()) transactionCount++;
+            }
+        });
+        
+        const averageBasketSize = transactionCount > 0 ? thisPeriodTotal / transactionCount : 0;
+
         let growthPercentage = 0;
         if (thisPeriodTotal === 0 && lastPeriodTotal === 0) {
             growthPercentage = 0;
@@ -103,6 +124,8 @@ export class GetAnalyticsDataUseCase {
         return {
             totalSales: thisPeriodTotal,
             growthPercentage,
+            transactionCount,
+            averageBasketSize,
             chartData,
             chartLabels,
             topMenus

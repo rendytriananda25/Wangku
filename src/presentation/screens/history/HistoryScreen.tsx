@@ -1,19 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, TextInput, TouchableOpacity, SectionList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Search, Store, UserCircle, ReceiptText, CheckCircle2, XCircle } from 'lucide-react-native';
 import { getTransactionHistoryUseCase } from '../../../core/di/container';
 import { TransactionEntity } from '../../../domain/entities/TransactionEntity';
 
 export default function HistoryScreen() {
     const [transactions, setTransactions] = useState<TransactionEntity[]>([]);
     const [loading, setLoading] = useState(true);
-    const [errorMsg, setErrorMsg] = useState('');
-    const [page, setPage] = useState(1);
-    const [showFilter, setShowFilter] = useState(false);
-    const [paymentFilter, setPaymentFilter] = useState<'Semua' | 'CASH' | 'QRIS'>('Semua');
-    const [timeFilter, setTimeFilter] = useState<'Semua Waktu' | 'Hari Ini' | 'Minggu Ini' | 'Bulan Ini'>('Semua Waktu');
-    const itemsPerPage = 8;
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         loadHistory();
@@ -22,196 +17,247 @@ export default function HistoryScreen() {
     const loadHistory = async () => {
         try {
             const data = await getTransactionHistoryUseCase.execute();
-            setTransactions(data);
+            // Sort by newest first
+            const sorted = data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setTransactions(sorted);
         } catch (error: any) {
             console.error('Failed to load history', error);
-            setErrorMsg(error.message || 'Unknown error');
         } finally {
             setLoading(false);
         }
     };
 
-    const filteredTransactions = transactions.filter(tx => {
-        // Filter Pembayaran
-        if (paymentFilter !== 'Semua' && tx.paymentMethod !== paymentFilter) return false;
-
-        // Filter Waktu
-        if (timeFilter !== 'Semua Waktu') {
-            const txDate = new Date(tx.createdAt);
-            const now = new Date();
-            
-            if (timeFilter === 'Hari Ini') {
-                if (txDate.toDateString() !== now.toDateString()) return false;
-            } else if (timeFilter === 'Minggu Ini') {
-                const diffTime = Math.abs(now.getTime() - txDate.getTime());
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                if (diffDays > 7) return false;
-            } else if (timeFilter === 'Bulan Ini') {
-                if (txDate.getMonth() !== now.getMonth() || txDate.getFullYear() !== now.getFullYear()) return false;
-            }
+    const groupedData = useMemo(() => {
+        let filtered = transactions;
+        if (searchQuery.trim() !== '') {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(t =>
+                t.id.toLowerCase().includes(query) ||
+                t.totalAmount.toString().includes(query)
+            );
         }
-        return true;
-    });
 
-    const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
-    const paginatedData = filteredTransactions.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+        const groups: { [key: string]: TransactionEntity[] } = {};
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    // Reset halaman ke 1 jika filter berubah
-    useEffect(() => {
-        setPage(1);
-    }, [paymentFilter, timeFilter]);
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
 
-    const formatDate = (date: Date) => {
+        filtered.forEach(tx => {
+            const txDate = new Date(tx.createdAt);
+            txDate.setHours(0, 0, 0, 0);
+            const timeDiff = txDate.getTime() - today.getTime();
+            let title = '';
+
+            if (timeDiff === 0) {
+                title = 'Hari Ini';
+            } else if (timeDiff === -86400000) { // 1 day in ms
+                title = 'Kemarin';
+            } else {
+                title = `${txDate.getDate()} ${txDate.toLocaleString('id-ID', { month: 'short' })} ${txDate.getFullYear()}`;
+            }
+
+            if (!groups[title]) groups[title] = [];
+            groups[title].push(tx);
+        });
+
+        return Object.keys(groups).map(title => {
+            const firstTx = groups[title][0];
+            const d = new Date(firstTx.createdAt);
+            const dateLabel = `${d.getDate()} ${d.toLocaleString('id-ID', { month: 'short' })} ${d.getFullYear()}`;
+
+            return {
+                title,
+                dateLabel: title === 'Hari Ini' || title === 'Kemarin' ? dateLabel : '',
+                data: groups[title]
+            };
+        });
+    }, [transactions, searchQuery]);
+
+    const formatTime = (date: Date) => {
         const d = new Date(date);
-        return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear().toString().slice(2)}`;
+        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     };
 
+    if (loading) {
+        return (
+            <View style={styles.center}>
+                <ActivityIndicator color="#006c49" size="large" />
+            </View>
+        );
+    }
+
     return (
-        <SafeAreaView style={styles.container}>
-            <Text style={styles.title}>Order History</Text>
-            
-            {loading && <ActivityIndicator size="large" color="#2563EB" style={{ marginBottom: 16 }} />}
-            {errorMsg ? <Text style={{ color: 'red', marginBottom: 16 }}>Error: {errorMsg}</Text> : null}
-
-            {/* Search & Filter */}
-            <View style={[styles.actionRow, { zIndex: 50 }]}>
-                <View style={styles.searchBox}>
-                    <Search size={18} color="#9CA3AF" />
-                    <TextInput 
-                        placeholder="Search" 
-                        placeholderTextColor="#9CA3AF"
-                        style={styles.searchInput}
-                    />
+        <SafeAreaView style={styles.container} edges={['top']}>
+            {/* TOP HEADER */}
+            <View style={styles.appBar}>
+                <View style={styles.appBarLeft}>
+                    <Store size={24} color="#006c49" />
+                    <Text style={styles.appBarTitle}>Wangku</Text>
                 </View>
-                
-                <View>
-                    <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilter(!showFilter)}>
-                        <SlidersHorizontal size={16} color="#374151" />
-                        <Text style={styles.filterText}>Filter</Text>
-                    </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton}>
+                    <UserCircle size={24} color="#6c7a71" />
+                </TouchableOpacity>
+            </View>
 
-                    {showFilter && (
-                        <View style={styles.filterMenu}>
-                            <Text style={styles.filterTitle}>Metode Pembayaran</Text>
-                            <View style={styles.filterOptions}>
-                                {['Semua', 'CASH', 'QRIS'].map((opt) => (
-                                    <TouchableOpacity key={opt} style={[styles.filterOptBtn, paymentFilter === opt && styles.filterOptBtnActive]} onPress={() => setPaymentFilter(opt as any)}>
-                                        <Text style={[styles.filterOptText, paymentFilter === opt && styles.filterOptTextActive]}>{opt}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
+            {/* Main Content Area */}
+            <View style={styles.mainContent}>
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
+                    <View style={styles.searchBox}>
+                        <Search size={20} color="#6c7a71" style={styles.searchIcon} />
+                        <TextInput
+                            placeholder="Search by ID or Amount..."
+                            placeholderTextColor="#6c7a71"
+                            style={styles.searchInput}
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                        />
+                    </View>
+                </View>
 
-                            <Text style={[styles.filterTitle, { marginTop: 16 }]}>Waktu Transaksi</Text>
-                            <View style={styles.filterOptions}>
-                                {['Semua Waktu', 'Hari Ini', 'Minggu Ini', 'Bulan Ini'].map((opt) => (
-                                    <TouchableOpacity key={opt} style={[styles.filterOptBtn, timeFilter === opt && styles.filterOptBtnActive]} onPress={() => setTimeFilter(opt as any)}>
-                                        <Text style={[styles.filterOptText, timeFilter === opt && styles.filterOptTextActive]}>{opt}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
+                {/* Section List */}
+                <SectionList
+                    sections={groupedData}
+                    keyExtractor={(item) => item.id}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.listContent}
+                    renderSectionHeader={({ section }) => (
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>{section.title}</Text>
+                            {!!section.dateLabel && (
+                                <Text style={styles.sectionDate}>{section.dateLabel}</Text>
+                            )}
                         </View>
                     )}
-                </View>
-            </View>
+                    renderItem={({ item, index, section }) => {
+                        const isRefunded = item.status === 'REFUNDED';
+                        const isFirst = index === 0;
+                        const isLast = index === section.data.length - 1;
 
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-                <Text style={[styles.headerText, { width: '35%' }]}>Order ID</Text>
-                <Text style={[styles.headerText, { width: '35%' }]}>Order date</Text>
-                <Text style={[styles.headerText, { width: '30%' }]}>Pembayaran</Text>
-            </View>
-
-            {/* Table Body */}
-            <View style={{ flex: 1 }}>
-                <FlatList
-                    data={paginatedData}
-                    keyExtractor={item => item?.id || Math.random().toString()}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 20 }}
-                    renderItem={({ item, index }) => {
-                        if (!item) return null;
-                        const isEven = index % 2 === 0;
-                        const isCash = item.paymentMethod === 'CASH';
                         return (
-                            <View style={[styles.tableRow, isEven && styles.tableRowEven]}>
-                                <Text style={[styles.rowText, { width: '35%' }]}>{item.id ? item.id.slice(0, 6).toUpperCase() : '-'}</Text>
-                                <Text style={[styles.rowText, { width: '35%' }]}>{item.createdAt ? formatDate(item.createdAt) : '-'}</Text>
-                                <View style={[styles.statusWrapper, { width: '30%' }]}>
-                                    <View style={[styles.statusDot, { backgroundColor: isCash ? '#10B981' : '#3B82F6' }]} />
-                                    <Text style={styles.rowText}>{item.paymentMethod || '-'}</Text>
-                                </View>
+                            <View style={[
+                                styles.transactionRowContainer,
+                                isFirst && styles.transactionRowContainerFirst,
+                                isLast && styles.transactionRowContainerLast
+                            ]}>
+                                <TouchableOpacity
+                                    style={[
+                                        styles.transactionItem,
+                                        isRefunded && styles.transactionItemRefunded,
+                                        !isLast && styles.itemBorderBottom,
+                                        isFirst && isRefunded && styles.transactionItemRefundedFirst,
+                                        isLast && isRefunded && styles.transactionItemRefundedLast
+                                    ]}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.itemLeft}>
+                                        <View style={[styles.iconBox, isRefunded && styles.iconBoxRefunded]}>
+                                            <ReceiptText size={20} color={isRefunded ? '#ba1a1a' : '#006c49'} />
+                                        </View>
+                                        <View style={styles.itemDetails}>
+                                            <View style={styles.itemIdRow}>
+                                                <Text style={[styles.txId, isRefunded && styles.textStrikeThrough]}>
+                                                    #{item.id.slice(0, 8).toUpperCase()}
+                                                </Text>
+                                                <View style={[styles.methodBadge, item.paymentMethod === 'CASH' ? styles.methodBadgeCash : styles.methodBadgeQris]}>
+                                                    <Text style={[styles.methodText, item.paymentMethod === 'CASH' ? styles.methodTextCash : styles.methodTextQris]}>
+                                                        {item.paymentMethod}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.itemRight}>
+                                        <Text style={[styles.amountText, isRefunded && styles.textStrikeThrough]}>
+                                            Rp {item.totalAmount.toLocaleString('id-ID')}
+                                        </Text>
+                                        <View style={[styles.statusBadge, isRefunded && styles.statusBadgeRefunded]}>
+                                            {isRefunded ? <XCircle size={12} color="#93000a" /> : <CheckCircle2 size={12} color="#00513a" />}
+                                            <Text style={[styles.statusText, isRefunded && styles.statusTextRefunded]}>
+                                                {item.status}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
                             </View>
                         );
                     }}
-                    ListEmptyComponent={<Text style={styles.empty}>Belum ada transaksi</Text>}
+                    ListEmptyComponent={
+                        <Text style={styles.emptyText}>Tidak ada transaksi ditemukan.</Text>
+                    }
                 />
-            </View>
-
-            {/* Pagination */}
-            <View style={styles.pagination}>
-                <TouchableOpacity 
-                    style={styles.pageBtn} 
-                    onPress={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                >
-                    <ChevronLeft size={18} color={page === 1 ? "#D1D5DB" : "#111827"} />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.pageBtn, styles.pageBtnActive]}>
-                    <Text style={styles.pageTextActive}>{page}</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.pageDots}>...</Text>
-
-                <TouchableOpacity style={styles.pageBtn} onPress={() => setPage(totalPages)}>
-                    <Text style={styles.pageText}>{totalPages}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                    style={styles.pageBtn} 
-                    onPress={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                >
-                    <ChevronRight size={18} color={page === totalPages ? "#D1D5DB" : "#111827"} />
-                </TouchableOpacity>
             </View>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingBottom: 100 },
-    title: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 24, marginTop: 12 },
-    
-    actionRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 12 },
-    searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 12, height: 44 },
-    searchInput: { flex: 1, marginLeft: 8, fontSize: 14, color: '#111827' },
-    filterBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 16, height: 44, gap: 8 },
-    filterText: { fontSize: 14, color: '#374151', fontWeight: '500' },
-    
-    filterMenu: { position: 'absolute', top: 52, right: 0, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10, width: 280 },
-    filterTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 8 },
-    filterOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    filterOptBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
-    filterOptBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' },
-    filterOptText: { fontSize: 12, color: '#4B5563', fontWeight: '500' },
-    filterOptTextActive: { color: '#1D4ED8', fontWeight: '700' },
+    center: { flex: 1, backgroundColor: '#f8f9fa', justifyContent: 'center', alignItems: 'center' },
+    container: { flex: 1, backgroundColor: '#f8f9fa' },
+    appBar: {
+        backgroundColor: '#ffffff', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#bbcabf', zIndex: 50
+    },
+    appBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    appBarTitle: { fontSize: 20, fontWeight: 'bold', color: '#006c49' },
+    iconButton: { padding: 4, borderRadius: 20 },
+    mainContent: { flex: 1 },
+    searchContainer: {
+        paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, backgroundColor: '#f8f9fa', zIndex: 40
+    },
+    searchBox: { position: 'relative', justifyContent: 'center' },
+    searchIcon: { position: 'absolute', left: 12, zIndex: 1 },
+    searchInput: {
+        backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#bbcabf', borderRadius: 12,
+        paddingVertical: 12, paddingLeft: 40, paddingRight: 16, fontSize: 14, color: '#191c1d'
+    },
+    listContent: { paddingHorizontal: 16, paddingBottom: 40 },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, marginTop: 16, paddingHorizontal: 8 },
+    sectionTitle: { fontSize: 14, fontWeight: '600', color: '#3c4a42' },
+    sectionDate: { fontSize: 12, color: '#6c7a71' },
 
-    tableHeader: { flexDirection: 'row', backgroundColor: '#E5E7EB', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 8, zIndex: 1 },
-    headerText: { fontSize: 13, color: '#111827', fontWeight: '700' },
-    
-    tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 16, borderRadius: 12 },
-    tableRowEven: { backgroundColor: '#F9FAFB' },
-    rowText: { fontSize: 13, color: '#374151', fontWeight: '500' },
-    statusWrapper: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    statusDot: { width: 6, height: 6, borderRadius: 3 },
-
-    pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, gap: 8 },
-    pageBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center' },
-    pageBtnActive: { backgroundColor: '#111827', borderColor: '#111827' },
-    pageText: { fontSize: 14, color: '#374151', fontWeight: '600' },
-    pageTextActive: { fontSize: 14, color: '#FFFFFF', fontWeight: '700' },
-    pageDots: { fontSize: 14, color: '#6B7280', marginHorizontal: 4 },
-
-    empty: { textAlign: 'center', color: '#9CA3AF', marginTop: 40 }
+    transactionRowContainer: {
+        backgroundColor: '#ffffff',
+        borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#bbcabf',
+    },
+    transactionRowContainerFirst: {
+        borderTopWidth: 1, borderTopLeftRadius: 12, borderTopRightRadius: 12, overflow: 'hidden'
+    },
+    transactionRowContainerLast: {
+        borderBottomWidth: 1, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden', marginBottom: 16
+    },
+    transactionItem: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16
+    },
+    transactionItemRefunded: { backgroundColor: 'rgba(255, 218, 214, 0.4)' },
+    transactionItemRefundedFirst: { borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+    transactionItemRefundedLast: { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
+    itemBorderBottom: { borderBottomWidth: 1, borderBottomColor: '#bbcabf' },
+    itemLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+    iconBox: { backgroundColor: '#f3f4f5', padding: 8, borderRadius: 8 },
+    iconBoxRefunded: { backgroundColor: '#ffdad6' },
+    itemDetails: { justifyContent: 'center' },
+    itemIdRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+    txId: { fontSize: 14, fontWeight: '600', color: '#191c1d' },
+    textStrikeThrough: { textDecorationLine: 'line-through', color: '#6c7a71' },
+    methodBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
+    methodBadgeQris: { backgroundColor: '#DBEAFE' },
+    methodBadgeCash: { backgroundColor: '#FEF3C7' },
+    methodText: { fontSize: 10, fontWeight: 'bold' },
+    methodTextQris: { color: '#1E40AF' },
+    methodTextCash: { color: '#92400E' },
+    timeText: { fontSize: 12, color: '#6c7a71' },
+    itemRight: { alignItems: 'flex-end' },
+    amountText: { fontSize: 14, fontWeight: '600', color: '#191c1d', marginBottom: 4 },
+    statusBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        backgroundColor: '#c3ecd7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12
+    },
+    statusBadgeRefunded: { backgroundColor: '#ffdad6' },
+    statusText: { fontSize: 10, fontWeight: 'bold', color: '#002115' },
+    statusTextRefunded: { color: '#93000a' },
+    emptyText: { textAlign: 'center', color: '#6c7a71', marginTop: 40 }
 });

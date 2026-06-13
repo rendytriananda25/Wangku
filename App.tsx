@@ -99,24 +99,32 @@ export default function App() {
         <TabScreen name="Pengaturan"><SettingsScreen /></TabScreen>
       </View>
 
-      <View style={styles.floatingNav}>
+      <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Menu')}>
-          <Store color={activeTab === 'Menu' ? '#2563EB' : '#9CA3AF'} size={24} />
+          <View style={[styles.iconContainer, activeTab === 'Menu' && styles.iconContainerActive]}>
+            <Store color={activeTab === 'Menu' ? '#007353' : '#6c7a71'} size={24} />
+          </View>
           <Text style={[styles.navText, activeTab === 'Menu' && styles.navTextActive]}>Menu</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Riwayat')}>
-          <Clock color={activeTab === 'Riwayat' ? '#2563EB' : '#9CA3AF'} size={24} />
+          <View style={[styles.iconContainer, activeTab === 'Riwayat' && styles.iconContainerActive]}>
+            <Clock color={activeTab === 'Riwayat' ? '#007353' : '#6c7a71'} size={24} />
+          </View>
           <Text style={[styles.navText, activeTab === 'Riwayat' && styles.navTextActive]}>Riwayat</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Statistik')}>
-          <LineChart color={activeTab === 'Statistik' ? '#2563EB' : '#9CA3AF'} size={24} />
+          <View style={[styles.iconContainer, activeTab === 'Statistik' && styles.iconContainerActive]}>
+            <LineChart color={activeTab === 'Statistik' ? '#007353' : '#6c7a71'} size={24} />
+          </View>
           <Text style={[styles.navText, activeTab === 'Statistik' && styles.navTextActive]}>Statistik</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('Pengaturan')}>
-          <SettingsIcon color={activeTab === 'Pengaturan' ? '#2563EB' : '#9CA3AF'} size={24} />
+          <View style={[styles.iconContainer, activeTab === 'Pengaturan' && styles.iconContainerActive]}>
+            <SettingsIcon color={activeTab === 'Pengaturan' ? '#007353' : '#6c7a71'} size={24} />
+          </View>
           <Text style={[styles.navText, activeTab === 'Pengaturan' && styles.navTextActive]}>Setelan</Text>
         </TouchableOpacity>
       </View>
@@ -125,34 +133,46 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  floatingNav: {
+  bottomNav: {
     position: 'absolute',
-    bottom: 24,
-    alignSelf: 'center',
+    bottom: 0,
+    width: '100%',
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 30,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    justifyContent: 'space-around',
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e1e3e4',
+    paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 24, // extra padding for bottom safe area
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 20,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 10,
     zIndex: 999,
-    gap: 24, // reduced gap to fit 4 icons
   },
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: 70,
+  },
+  iconContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 4,
+  },
+  iconContainerActive: {
+    backgroundColor: '#97f5cc',
   },
   navText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6c7a71',
   },
   navTextActive: {
-    color: '#2563EB',
+    color: '#007353',
+    fontWeight: '700',
   }
 });
